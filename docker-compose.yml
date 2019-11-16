@@ -1,0 +1,20 @@
+version: "3.5"
+
+volumes:
+  pkg:
+
+services:
+
+  app:
+    image: twilio-client:dev
+    volumes:
+    - pkg:/go/pkg
+    - ./:/go/src/github.com/68696c6c/twilio-client
+    working_dir: /go/src/github.com/68696c6c/twilio-client
+    env_file:
+    - .secret.env
+#    - .app.env
+#    environment:
+#      VIRTUAL_HOST: build.loom.local
+#      ENV: debug
+#      LISTEN_PORT: 80
