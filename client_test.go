@@ -37,4 +37,5 @@ func TestClient_SendSMS(t *testing.T) {
 	println("response: ", response.String())
 	require.Nil(t, err, "unexpected error returned")
 	assert.NotEqual(t, Response{}, response, "empty twilio response returned")
+	assert.NotNil(t, response.HTTPResponse, "empty http response returned")
 }
