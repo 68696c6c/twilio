@@ -1,4 +1,4 @@
-package twilio_client
+package twilio
 
 import (
 	"os"
@@ -31,11 +31,10 @@ func TestClient_SendSMS(t *testing.T) {
 	toPhone := os.Getenv("TEST_TO_PHONE")
 	require.NotEmpty(t, toPhone, "missing TEST_TO_PHONE")
 
-	c := NewTwilioClient(accountSID, authToken, accountPhone)
-	err := c.SendSMS(toPhone, "hello world")
-	require.Nil(t, err, "unexpected error returned")
+	c := NewClient(accountSID, authToken, accountPhone)
+	response, err := c.Send(toPhone, "hello world")
 
-	response := c.GetResponse()
-	assert.NotEqual(t, TwilioResponse{}, response, "empty twilio response returned")
 	println("response: ", response.String())
+	require.Nil(t, err, "unexpected error returned")
+	assert.NotEqual(t, Response{}, response, "empty twilio response returned")
 }

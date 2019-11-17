@@ -1,4 +1,4 @@
-package twilio_client
+package twilio
 
 import (
 	"bytes"
@@ -12,24 +12,20 @@ import (
 	"github.com/pkg/errors"
 )
 
-type TwilioClient interface {
-	SendSMS(to, message string) error
-	GetRawResponse() http.Response
-	GetResponse() TwilioResponse
+type SMSClient interface {
+	Send(to, message string) (Response, error)
 }
 
-type TwilioClientHTTP struct {
-	accountSID   string
-	authToken    string
-	phoneNumber  string
-	url          string
-	client       *http.Client
-	httpResponse *http.Response
-	response     *TwilioResponse
+type Client struct {
+	accountSID  string
+	authToken   string
+	phoneNumber string
+	url         string
+	client      *http.Client
 }
 
-func NewTwilioClient(accountSID, authToken, phoneNumber string) TwilioClient {
-	return &TwilioClientHTTP{
+func NewClient(accountSID, authToken, phoneNumber string) SMSClient {
+	return &Client{
 		accountSID:  accountSID,
 		authToken:   authToken,
 		phoneNumber: phoneNumber,
@@ -38,7 +34,8 @@ func NewTwilioClient(accountSID, authToken, phoneNumber string) TwilioClient {
 	}
 }
 
-type TwilioResponse struct {
+type Response struct {
+	HTTPResponse        *http.Response `json:"-"`
 	DateCreated         string
 	DateUpdated         string
 	Body                string
@@ -61,7 +58,7 @@ type TwilioResponse struct {
 	ErrorMessage        error
 }
 
-func (r TwilioResponse) String() string {
+func (r Response) String() string {
 	out, err := json.Marshal(&r)
 	if err != nil {
 		return "failed to marshal response"
@@ -69,60 +66,44 @@ func (r TwilioResponse) String() string {
 	return string(out)
 }
 
-func (c *TwilioClientHTTP) SendSMS(to, message string) error {
-	c.httpResponse = nil
-	c.response = nil
+func (c *Client) Send(to, message string) (Response, error) {
+	data := url.Values{}
+	data.Set("To", to)
+	data.Set("From", c.phoneNumber)
+	data.Set("Body", message)
+	dataReader := *strings.NewReader(data.Encode())
 
-	msgData := url.Values{}
-	msgData.Set("To", to)
-	msgData.Set("From", c.phoneNumber)
-	msgData.Set("Body", message)
-	msgDataReader := *strings.NewReader(msgData.Encode())
+	req, err := http.NewRequest("POST", c.url, &dataReader)
+	if err != nil {
+		return Response{}, errors.Wrap(err, "failed to build request")
+	}
 
-	req, _ := http.NewRequest("POST", c.url, &msgDataReader)
 	req.SetBasicAuth(c.accountSID, c.authToken)
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return errors.Wrap(err, "failed to send request")
+		return Response{}, errors.Wrap(err, "failed to send request")
 	}
-
-	c.httpResponse = resp
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		response := &TwilioResponse{}
+		response := Response{}
 		body, err := streamToByte(resp.Body)
 		if err != nil {
-			return errors.Wrap(err, "failed to read response body")
+			return Response{}, errors.Wrap(err, "failed to read response body")
 		}
 
-		err = json.Unmarshal(body, response)
+		err = json.Unmarshal(body, &response)
 		if err != nil {
-			return errors.Wrap(err, "failed to unmarshal response body")
+			return Response{}, errors.Wrap(err, "failed to unmarshal response body")
 		}
 
-		c.response = response
+		response.HTTPResponse = resp
 
-		return nil
+		return response, nil
 	} else {
-		return errors.Wrapf(err, "received error response from twilio api: %s", resp.Status)
+		return Response{}, errors.Wrapf(err, "received error response from twilio api: %s", resp.Status)
 	}
-}
-
-func (c *TwilioClientHTTP) GetRawResponse() http.Response {
-	if c.httpResponse == nil {
-		return http.Response{}
-	}
-	return *c.httpResponse
-}
-
-func (c *TwilioClientHTTP) GetResponse() TwilioResponse {
-	if c.response == nil {
-		return TwilioResponse{}
-	}
-	return *c.response
 }
 
 func streamToByte(stream io.Reader) ([]byte, error) {

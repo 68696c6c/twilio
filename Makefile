@@ -1,4 +1,4 @@
-IMAGE_NAME = twilio-client
+IMAGE_NAME = twilio
 
 DOC_PATH_BASE = docs/swagger.json
 DOC_PATH_FINAL = docs/api-spec.json
