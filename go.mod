@@ -1,4 +1,4 @@
-module github.com/68696c6c/twilio-client
+module github.com/68696c6c/twilio
 
 go 1.13
 
